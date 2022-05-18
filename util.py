@@ -2,19 +2,24 @@ import torch
 import numpy as np
 
 
-#input : gt bbox(4), target_anchor box(batch_size,anchor_idx,4)
+#input : gt bbox(N,4), target_anchor box(8940,4)
 def IoU(target_anchor,area,bbox,batch_size):
+    '''
+    gt_bbox : (N,4)
+    target_anchor : (8940,4)
+    IoU : (N,8940)
+    '''
 
-    IoU = np.empty((batch_size,len(target_anchor[0])),dtype=np.float32) #(4,8940)
+    IoU = np.empty((batch_size,len(target_anchor)),dtype=np.float32) #(4,8940)
     
-    print("util.bbox",bbox)
     for b in range(batch_size):
-        for i,anchor in enumerate(target_anchor[b]):
+        for i,anchor in enumerate(target_anchor):
+            
             xa1,ya1,xa2,ya2 = anchor #anchor box 좌표
-            anchor_area = area
+            anchor_area = area[b]
             #anchor_area = (xa2 - xa1) * (ya2 - ya1)
 
-            xb1,yb1,xb2,yb2 = bbox
+            xb1,yb1,xb2,yb2 = bbox[b]
             box_area = (xb2 - xb1) * (yb2 - yb1)
             #print(bbox,xb1,yb1,xb2,yb2)
 
@@ -128,3 +133,27 @@ def get_anchors(features,anchor,feat_stride=16):
 
 
     return all_anchors
+
+def bbox_transform_batch(anchor, gt_box):
+    #anchor : (N,8940,4)->expand,  gt_box : (N,8940,4)
+    #target : (N,8940,4)
+    
+    width = anchor[:,:,2] - anchor[:,:,0] + 1.0
+    height = anchor[:,:,3] - anchor[:,:,1] + 1.0
+    ctr_x = anchor[:,:,0] + 0.5 * width
+    ctr_y = anchor[:,:,1] + 0.5 * height
+
+    gt_width = gt_box[:,:,2] - gt_box[:,:,0] + 1.0
+    gt_height = gt_box[:,:,3] - gt_box[:,:,1] + 1.0
+    gt_ctr_x = gt_box[:,:,0] + 0.5 * gt_width
+    gt_ctr_y = gt_box[:,:,1] + 0.5 * gt_height
+
+    target_dx = (gt_ctr_x - ctr_x) / width
+    target_dy = (gt_ctr_y - ctr_y) / height
+    target_dw = torch.log(gt_width / width)
+    target_dh = torch.log(gt_height / height)
+
+    target = torch.stack((target_dx, target_dy, target_dw, target_dh),2)
+    
+    return target
+

@@ -13,7 +13,7 @@ def proposal_layer(score,bbox_delta,anchor):
 
     #bbox_transform
     bbox_delta = bbox_delta.permute(0,2,3,1).contiguous()
-    bbox_delta = bbox_delta.view(batch_size,-1,4)ㅑ
+    bbox_delta = bbox_delta.view(batch_size,-1,4)
 
     #bbox transform
     proposal_boxes = bbox_transform(anchor,bbox_delta)

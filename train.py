@@ -10,20 +10,20 @@ import cv2
 from anchor_generator import anchor_generator
 from anchor_target_layer import anchor_target
 from model import VGG
-import RPN
-import fasterRCNN
+from RPN import RPN
+import pandas as pd
+from emotic_dataset import Emotic_CSVDataset
+#import fasterRCNN
 
 def main():
-    devide = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     transform = transforms.Compose([
             transforms.Resize((800,800)),
-                    transforms.ToTensor(),
-                        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-]) 
+                    transforms.ToTensor()]) 
 
-    batch_size = 3
-
+    batch_size = 2
+    '''
     train_set = coco('./coco','train','2017', transform)
 
     train_load = torch.utils.data.DataLoader(train_set,batch_size=batch_size ,shuffle=True,collate_fn=train_set.collate_fn)
@@ -44,27 +44,41 @@ def main():
         label = label[0]
         area = area[0]
         is_crowd = is_crowd[0]
+    '''
 
-    #print(bbox,label,image_id,area,is_crowd)
+    context_mean = [0.4690646, 0.4407227, 0.40508908]
+    context_std = [0.2514227, 0.24312855, 0.24266963]
+    body_mean = [0.43832874, 0.3964344, 0.3706214]
+    body_std = [0.24784276, 0.23621225, 0.2323653]
+    context_norm = [context_mean, context_std]
+    body_norm = [body_mean, body_std]
 
-    #anchor = anchor_generator(batch_size)
-    #valid = anchor_target(anchor,bbox,area,batch_size)
-    #print("anchor",anchor.shape,"valid",valid.shape)
+    cat2ind = {}
 
+    cat = ['Affection', 'Anger', 'Annoyance', 'Anticipation', 'Aversion', 'Confidence', 'Disapproval', 'Disconnection','Disquietment', 'Doubt/Confusion', 'Embarrassment', 'Engagement', 'Esteem', 'Excitement', 'Fatigue', 'Fear','Happiness','Pain', 'Peace', 'Pleasure', 'Sadness', 'Sensitivity', 'Suffering', 'Surprise', 'Sympathy', 'Yearning']
+
+    for idx,emotion in enumerate(cat):
+        cat2ind[emotion] = idx
+
+    data_df = pd.read_csv('./data/emotic_pre/train.csv')
+    train_dataset = Emotic_CSVDataset(data_df,cat2ind,transform,context_norm,body_norm,data_src='./emotic')
+
+    train_loader = torch.utils.data.DataLoader(train_dataset,batch_size = batch_size,shuffle=True)
     model = VGG()
-    #print(data)
-    #print("images",images)
-    #print("targets",targets)    
-
-    for i, data in enumerate(train_load,0):
+    rpn = RPN()
+    data_iter = iter(train_loader)
+    image,bbox,label,area = next(data_iter)
+    
+    for i, data in enumerate(train_loader,0):
         
-        inputs, label = data
-        print(inputs[0].unsqueeze(0))
-        #tensor(1,3,800,800)
-        output = model(inputs[0].unsqueeze(0))
-
-
-
+        inputs, bbox,label,area  = data
+        
+        #tensor(N,3,800,800)
+        output = model(inputs)
+        
+        out1,out2,out3=rpn(output,bbox,area)
+    '''
+    
     for epoch in range(epochs):
 
         for i,data in enumerate(train_load,0):
@@ -86,17 +100,19 @@ def main():
             loss.backward()
             optimizer.step()
     '''
-    dataiter = iter(train_load)
-    images, targets = dataiter.next()
+    '''
+    dataiter = iter(train_loader)
+    images,bbox,label = dataiter.next()
     
     
     img = images[0].numpy()
     plt.imshow(np.transpose(img,(1,2,0)))
     plt.show()
+    '''
 
-    targets = [{k: v for k,v in t.items()} for t in targets]
-    print(targets)
-    '''    
+    #targets = [{k: v for k,v in t.items()} for t in targets]
+    #print(targets)
+        
 
     '''
     for images,targets in train_load:

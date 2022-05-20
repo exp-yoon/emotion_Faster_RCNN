@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-def anchor_generator(batch_size):
+def anchor_generator():
 
     #img shape check
     #image_size = images.shape  
@@ -70,7 +70,7 @@ def anchor_generator(batch_size):
     plt.imshow(img)
     plt.show()
     '''
-
+    #anchor_box = torch.from_numpy(anchor_box)
     return anchor_box   
 
 #anchor_generator(16)

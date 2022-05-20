@@ -19,6 +19,6 @@ class VGG(nn.Module):
     def forward(self,images):
         
         features = self.vggnet(images)
-        print(features.size())
+        
         return features
 

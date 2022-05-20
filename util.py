@@ -112,10 +112,10 @@ def nms(dets, thresh):
         order = order[inds + 1]
 
     return torch.IntTensor(keep)
-
+'''
 def get_anchors(features,anchor,feat_stride=16):
 
-    h,w = featurs.size()[-2:] #50,50
+    h,w = features.size()[-2:] #50,50
 
     shift_x = np.arrange(0,w) * feat_stride
     shift_y = np.arrange(0,h) * feat_stride
@@ -133,7 +133,7 @@ def get_anchors(features,anchor,feat_stride=16):
 
 
     return all_anchors
-
+'''
 def bbox_transform_batch(anchor, gt_box):
     #anchor : (N,8940,4)->expand,  gt_box : (N,8940,4)
     #target : (N,8940,4)
@@ -157,3 +157,17 @@ def bbox_transform_batch(anchor, gt_box):
     
     return target
 
+def smooth_l1_loss(bbox_pred, bbox_target, bbox_inside_weight, sigma = 1.0, dim=[1]):
+
+    sigma_2 = sigma **2
+    box_diff = bbox_pred - bbox_target
+    in_box_diff = bbox_inside_weight * box_diff
+    abs_in_box_diff = torch.abs(in_box_diff)
+    smoothl1_sign = (abs_in_box_diff < 1. / sigma_2).detach().float()
+    in_loss_box = torch.pow(in_box_diff,2) * (sigma_2 / 2.) * smoothl1_sign + (abs_in_box_diff - (0.5 / sigma_2)) * (1. - smoothl1_sign)
+    
+    for i in sorted(dim, reverse=True):
+        in_loss_box = in_loss_box.sum(i)
+    in_loss_box = in_loss_box.mean()
+    
+    return in_loss_box

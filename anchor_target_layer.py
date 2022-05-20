@@ -19,26 +19,22 @@ def anchor_target(anchor, bbox, area ,batch_size):
     
 
     anchor_box = anchor # (22500,4)
-    total_anchor = len(anchor_box)
-    
+    total_anchor = anchor_box.size(0)#22500
+
     #valid anchor box select, img size->input
     index_inside = ((anchor_box[:,0] >= 0) &
             (anchor_box[:,1] >= 0) &
             (anchor_box[:,2] <= 800) &
             (anchor_box[:,3] <= 800))
-    
+
     #return inside anchor index
-    inside_anchor = np.where(index_inside == 1)   
-    
+    inside_anchor = torch.nonzero(index_inside).view(-1)
 
     #anchors : (8940,4)
-    anchors = anchor_box[inside_anchor,:].squeeze(0)
-    
+    anchors = anchor_box[inside_anchor,:]
 
     #anchor_label : (N,8940)
-    anchor_label = np.empty((batch_size,len(inside_anchor[0])), dtype = np.int32)
-    anchor_label.fill(-1) #default other(-1)
-       
+    anchor_label = torch.Tensor(batch_size,inside_anchor.size(0)).fill_(-1).type(torch.int32)
     
     #IoU calc, IoU_list = (N,8940)
     IoU_list = IoU(anchors,area,bbox,batch_size)
@@ -59,6 +55,7 @@ def anchor_target(anchor, bbox, area ,batch_size):
             elif IoU_list[b,i] < neg_iou_threshold:
                 anchor_label[b,i] = 0
     
+    #print("anchoe_label",anchor_label)
 
     #mini_batch
     
@@ -79,9 +76,11 @@ def anchor_target(anchor, bbox, area ,batch_size):
             add_idx = np.random.choice(neg_index, size = ((n_sample//2)-len(pos_index)),replace = False)
             anchor_label[b,add_idx] = 1
     
+    #print("anchor_label",anchor_label)
+
     pos = anchor_label > 0
         
-    '''
+    '''    
     for b in range(batch_size):
         pos_index = np.where(anchor_label[b] == 1)[0]
         neg_index = np.where(anchor_label[b] == 0)[0]
@@ -89,27 +88,23 @@ def anchor_target(anchor, bbox, area ,batch_size):
     '''
 
     #anchor shape expand(8940,4)->(N,8940,4)
-    batch_anchors = torch.from_numpy(anchors)
-    batch_anchors = batch_anchors.expand(batch_size,len(anchors),4)
-    
+    batch_anchors = anchors.expand(batch_size,anchors.size(0),4)
+    #print("batch_anchors",batch_anchors)
     #gt_box shape expand(N,4)->(N,8940,4)
-    gt_box = torch.from_numpy(bbox)
-    gt_box = gt_box.repeat(1,8940).view(batch_size,8940,4)
+    gt_box = bbox.repeat(1,8940).view(batch_size,8940,4)
     
     #anchors : (N,8940,4) , gt_box : (N,8940,4)
     bbox_target = bbox_transform_batch(batch_anchors,gt_box)
     
     # (N,8940,4)
-    bbox_inside_weight = np.zeros((batch_size,len(inside_anchor[0]),4)) 
-
+    bbox_inside_weight = np.zeros((batch_size,inside_anchor.size(0),4))
+    
     bbox_inside_weight[anchor_label == 1] = [1.0,1.0,1.0,1.0]
     
     bbox_inside_weight = torch.from_numpy(bbox_inside_weight)
     
-    # transform to tensor
-    anchor_label = torch.from_numpy(anchor_label)
-    inside_anchor = torch.from_numpy(inside_anchor[0])
-
+    #print("bbox_inside",bbox_inside_weight)
+    
     #8940 -> 22500
     #anchor_label:(2,22500) , bbox_target : (2,22500,4), bbox_inside_weight : (2,22500,4)
     anchor_label = _unmap(anchor_label,total_anchor,inside_anchor,batch_size,fill=-1)
@@ -118,7 +113,7 @@ def anchor_target(anchor, bbox, area ,batch_size):
 
 
     anchor_label = anchor_label.view(batch_size,50,50,9).permute(0,3,1,2).contiguous()
-    anchor_label = anchor_label.view(batch_size,1,9*50*50) #(N,1,22500)
+    anchor_label = anchor_label.view(batch_size,1,9*50,50) #(N,1,22500)
     ## 근데 여기 왜 (N,1,50,9*50)으로 하지..
     
     bbox_target = bbox_target.view(batch_size,50,50,36).permute(0,3,1,2).contiguous()
@@ -126,7 +121,7 @@ def anchor_target(anchor, bbox, area ,batch_size):
     anchor_count = bbox_inside_weight.size(1) # 22500
     bbox_inside_weight = bbox_inside_weight.view(batch_size,anchor_count,4)
     bbox_inside_weight = bbox_inside_weight.contiguous().view(batch_size,50,50,36).permute(0,3,1,2).contiguous()
-
+    
     #(N,1,22500) , (N,36,50,50), (N,36,50,50)
     return anchor_label,bbox_target,bbox_inside_weight
     
@@ -148,11 +143,4 @@ def _unmap(data,count,inds,batch_size,fill=0):
         ret[:,inds,:] = data
 
     return ret
-
-
-anchor_boxes = anchor_generator(2)
-
-gt_box = np.array([[10,50,40,80],[20,60,40,100]])
-
-anchor_target(anchor_boxes,gt_box,[20,50],2)
 

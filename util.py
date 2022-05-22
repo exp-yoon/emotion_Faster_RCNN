@@ -52,7 +52,7 @@ def bbox_transform(anchor,delta,batch_size):
     dw = delta[:,:,2::4]
     dh = delta[:,:,3::4]
 
-    pred_ctr_x = dx * widht.unsqueeze(2) + ctr_x.unsqueeze(2)
+    pred_ctr_x = dx * width.unsqueeze(2) + ctr_x.unsqueeze(2)
     pred_ctr_y = dy * height.unsqueeze(2) + ctr_y.unsqueeze(2)
     pred_w = torch.exp(dw) * width.unsqueeze(2)
     pred_h = torch.exp(dh) * height.unsqueeze(2)
@@ -73,16 +73,16 @@ def bbox_transform(anchor,delta,batch_size):
 def clip_box(box,img_shape, batch_size):
 
     for i in range(batch_size):
-        box[i,:,0::4].clamp_(0, img_shape[i,1]-1)
-        box[i,:,1::4].clamp_(0, img_shape[i,0]-1)
-        box[i,:,2::4].clamp_(0, img_shape[i,1]-1)
-        box[i,:,3::4].clamp_(0, img_shape[i,0]-1)
+        box[i,:,0::4].clamp_(0, img_shape[1]-1)
+        box[i,:,1::4].clamp_(0, img_shape[0]-1)
+        box[i,:,2::4].clamp_(0, img_shape[1]-1)
+        box[i,:,3::4].clamp_(0, img_shape[0]-1)
 
     return box
 
 def nms(dets, thresh):
     
-    dets = dets.numpy()
+    dets = dets.detach().numpy()
     x1 = dets[:,0]
     y1 = dets[:,1]
     x2 = dets[:,2]

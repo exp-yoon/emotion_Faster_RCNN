@@ -76,7 +76,7 @@ def anchor_target(anchor, bbox, area ,batch_size):
             add_idx = np.random.choice(neg_index, size = ((n_sample//2)-len(pos_index)),replace = False)
             anchor_label[b,add_idx] = 1
     
-    #print("anchor_label",anchor_label)
+    
 
     pos = anchor_label > 0
         

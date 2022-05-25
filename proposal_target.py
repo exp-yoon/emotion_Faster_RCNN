@@ -1,45 +1,55 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from util import IoU
+from util import IoU_roi
 
 
-def proposal_target_layer(roi,gt_box):
+def proposal_target_layer(roi,gt_box,area,batch_size):
     
+    num_class = 26
     n_sample = 128
     iou_threshold = 0.5
     pos_ratio = 0.25
     neg_ratio = 0.75
-    IoU_list = IoU(roi,gt_box,batch_size)
     
-    roi_label = np.empty((batch_size,2000))
-    roi_label.fill(-1)
+    gt_box = gt_box.view(batch_size,1,-1)
+    gt_box_append = gt_box.new(gt_box.size()).zero_()
+    #fisrt bbox coord, 1box per image -> (N,1,5)
+    gt_box_append[:,:,1:5] = gt_box[:,:,:4]
+
+    #all_roi : (N,1000,5), gt_box_append : (N,1,5) -> CAT (N,1000+1,5)
+    all_roi = torch.cat([roi,gt_box_append],1)
     
-    for b in range(batch_size):
-        for i in range(2000):
-                                    
-            if IoU_list[b,i] >= iou_threshold:
-                roi_label[b,i] = 1
-                                                                    
-            elif IoU_list[b,i] < iou_threshold:
-                roi_label[b,i] = 0
 
-    #mini_batch                                           
-    for b in range(batch_size):
-        pos_index = np.where(roi_label[b] == 1)[0]
-        neg_index = np.where(roi_label[b] == 0)[0]
+    num_image = 1
+    roi_per_image = int(batch_size/num_image) #N
+    #minubatch pos ratio -> N*0.25
+    fg_roi_per_image = int(np.round(pos_ratio * roi_per_image))
+    fg_roi_per_image = 1 if fg_roi_per_image == 0 else fg_roi_per_image 
 
-        if len(pos_index) > n_sample * pos_ratio :
-            disable_idx = np.random.choice(pos_index,size = (len(pos_index)-(n_sample * pos_ratio)),replace = False)
-            roi_label[b,disable_idx] = -1                                
-        
-        if len(neg_index) > n_sample * neg_ratio: 
-            disable_idx = np.random.choice(neg_index, size = (len(neg_index)-(n_sample * neg_ratio)),replace = False)
-            roi_label[b,disable_idx] = -1
+    labels,rois,bbox_targets,bbox_inside_weight = sample_rois(all_roi,area,gt_box,fg_roi_per_image,roi_per_image,num_class)
 
-        if len(pos_index) < n_sample * pos_ratio:
-            add_idx = np.random.choice(neg_index, size = ((n_sample * pos_ratio) - len(pos_index)),replace = False)
-            roi_label[b,add_idx] = 1
+    return rois,label,bbox_targets,bbox_inside_weight
 
+def sample_rois(all_roi,area,gt_box,fg_roi_per_image,roi_per_image,num_class):
+    gt_box = gt_box.squeeze(1)[:,:4]
+    all_roi = all_roi[:,:,1:5]
+    print(all_roi.shape)
+    batch_size = 2
+    #calc iou : (N,num_roi(1000),1)    
 
-    return roi_label
+    IoU_list = IoU_roi(all_roi,area,gt_box,batch_size)
+    IoU_list = torch.from_numpy(IoU_list)
+    print(IoU_list,IoU_list.shape)
+    max_iou, max_iou_idx = torch.max(IoU_list,1)
+    print(max_iou,max_iou_idx)
+
+    batch_size = IoU_list.size(0)
+    print(batch_size)
+    #arrange -> tensor(0,1..N-1) : (N) , gt_box.size(1) = 1
+    offset = torch.arrange(0,batch_size) * gt_box.size(1)
+    #offset : (N,1) + max roi idx 값 더하기
+    offset = offset.view(-1,1) + max_iou_idx
+
+    #label : ()
+    labels = gt_box[:,:,4].contiguous().view(-1).index((offset.view(-1),)).view(batch_size,-1)

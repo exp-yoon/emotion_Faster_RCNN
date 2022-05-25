@@ -9,18 +9,14 @@ def IoU(target_anchor,area,bbox,batch_size):
     target_anchor : (8940,4)
     IoU : (N,8940)
     '''
-
     IoU = np.empty((batch_size,len(target_anchor)),dtype=np.float32) #(4,8940)
-    
     for b in range(batch_size):
-        for i,anchor in enumerate(target_anchor):
-            
+        for i,anchor in enumerate(target_anchor):        
             xa1,ya1,xa2,ya2 = anchor #anchor box 좌표
-            anchor_area = area[b]
-            #anchor_area = (xa2 - xa1) * (ya2 - ya1)
+            anchor_area = (xa2 - xa1) * (ya2 - ya1)
 
             xb1,yb1,xb2,yb2 = bbox[b]
-            box_area = (xb2 - xb1) * (yb2 - yb1)
+            box_area = area[b]
             #print(bbox,xb1,yb1,xb2,yb2)
 
             #겹치는 box 좌하단, 우상단 x,y 좌표
@@ -41,6 +37,40 @@ def IoU(target_anchor,area,bbox,batch_size):
 
     return IoU
 
+
+def IoU_roi(rois,area,bbox,batch_size):
+
+    '''
+    gt_bbox : (N,4)
+    rois : (N,1001,4)
+    IoU : (N,1001)
+    '''
+
+    IoU = np.empty((batch_size,rois.size(1)),dtype=np.float32) # (N,1001) 
+    for b in range(batch_size):
+        for i,roi in enumerate(rois[b]):
+            print(roi)
+            xa1,ya1,xa2,ya2 = roi 
+            roi_area = (xa2-xa1) * (ya2-ya1)
+
+            xb1,yb1,xb2,yb2 = bbox[b]
+            box_area = area[b]
+
+            inter_x1 = max(xa1,xb1)
+            inter_y1 = max(ya1,yb1)
+            inter_x2 = min(xa2,xb2)
+            inter_y2 = min(ya2,yb2)
+
+            if (inter_x1 < inter_x2) and (inter_y1 < inter_y2):
+                inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
+                iou = inter_area / (roi_area + box_area - inter_area)
+            else:
+                iou = 0
+                
+            IoU[b,i] = iou
+
+    return IoU
+    
 def bbox_transform(anchor,delta,batch_size):
     width = anchor[:,:,2] - anchor[:,:,0]
     height = anchor[:,:,3] - anchor[:,:,1]

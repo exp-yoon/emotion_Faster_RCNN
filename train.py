@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 from anchor_generator import anchor_generator
 from anchor_target_layer import anchor_target
+from proposal_target import proposal_target_layer
 from model import VGG
 from RPN import RPN
 import pandas as pd
@@ -68,15 +69,22 @@ def main():
     rpn = RPN()
     data_iter = iter(train_loader)
     image,bbox,label,area = next(data_iter)
-    
+            
     for i, data in enumerate(train_loader,0):
         
         inputs, bbox,label,area  = data
-        
+        print(bbox,area)  
+
+        bbox_c = torch.zeros(batch_size,5,dtype=torch.int32)
+        bbox_c[:,0:4] = bbox[:,:4]
+        print(bbox_c)
         #tensor(N,3,800,800)
-        output = model(inputs)
+        feature = model(inputs)
         
-        out1,out2,out3=rpn(output,bbox,area)
+        rois,rpn_loss_cls,rpn_loss_reg=rpn(feature,bbox,area)
+
+        proposal_target_layer(rois,bbox_c,area,batch_size)
+
     '''
     
     for epoch in range(epochs):

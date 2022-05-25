@@ -4,7 +4,6 @@ from torch.nn import functional as F
 from anchor_generator import anchor_generator
 from anchor_target_layer import anchor_target
 from proposal_layer import proposal_layer
-#from util import get_anchors
 from util import smooth_l1_loss
 from torch.autograd import Variable
 
@@ -58,7 +57,7 @@ class RPN(nn.Module):
     
         #input(score:(batch,18,50,50), bbox:(batch,36,50,50), anchor:(22500,4)
         rois = proposal_layer(rpn_cls_score,rpn_bbox_pred,anchor)
-        #rois : (N,2000,5)
+        #rois : (N,1000,5)
 
         #RPN training -> rpn_label(minibatch) from anchor_target layer and rpn_loss
 
@@ -91,5 +90,5 @@ class RPN(nn.Module):
 
             print("reg_loss",self.rpn_loss_box)
             
-            print("roi",rois,rois.shape)
+            #print("roi",rois,rois.shape)
         return rois, self.rpn_loss_cls, self.rpn_loss_box

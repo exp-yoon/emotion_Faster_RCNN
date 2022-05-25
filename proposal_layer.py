@@ -31,12 +31,12 @@ def proposal_layer(score,bbox_delta,anchor):
     score = score.permute(0,2,3,1).contiguous()
     score = score.view(batch_size, -1)
     
-    #clip predicted box to image
+    #clip predicted box to image(N,22500,4)
     proposal = clip_box(proposal_boxes,img_shape, batch_size) #img_shape 정의
 
     nms_thresh = 0.7
     n_pre_nms = 12000
-    n_post_nms = 2000
+    n_post_nms = 1000
     #sorted score list DESC
     #order : (2,22500) -> 높은 score순서대로 anchor의 index 반환
     _,order = torch.sort(score, 1,True)
@@ -48,29 +48,39 @@ def proposal_layer(score,bbox_delta,anchor):
     
     for i in range(batch_size):
         
+        #(22500,4), (22500)
         proposal_single = proposal_keep[i]
         score_single = score_keep[i]
-
+        
         order_single = order[i]
-
-        #order_single : tensor (12000)
+        #order_single : tensor (22500)
+        #print("order_single",order_single,order_single.shape)
+        
+        #score 상위 12000개 
         if n_pre_nms > 0 and n_pre_nms < score.numel():
             order_single = order_single[:n_pre_nms]
 
+        #proposal 상위 12000개 slice
         proposal_single = proposal_single[order_single,:]
+        #score 상위 12000개 slice (12000) -> (12000,1) 
         score_single = score_single[order_single].view(-1,1)
-
+        
+        #return index (13??) 개수가 항상 다름 ..  
         keep_idx = nms(torch.cat((proposal_single,score_single),1),nms_thresh)
+        
+        #print("keep",keep_idx,keep_idx.shape)
         keep_idx = keep_idx.long().view(-1)
 
         if n_post_nms > 0:
             keep_idx = keep_idx[:n_post_nms]
 
+        #keep된 index만 select
         proposal_single = proposal_single[keep_idx, :]
         score_single = score_single[keep_idx, :]
 
         num_proposal = proposal_single.size(0)
-        output[i,:,0] = i
+        
+        output[i,:,0] = i #batch number
         output[i, :num_proposal, 1:] = proposal_single
 
     return output 

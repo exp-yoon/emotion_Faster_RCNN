@@ -47,7 +47,7 @@ class Emotic_CSVDataset(Dataset):
   
   def __getitem__(self, index):
     row = self.data_df.loc[index]
-    image_context = Image.open(os.path.join(self.data_src, row['Folder'], row['Filename']))
+    image_context = Image.open(os.path.join(self.data_src, row['Folder'], row['Filename'])).convert('RGB')
     bbox = ast.literal_eval(row['BBox'])
     image_body = image_context.crop((bbox[0], bbox[1], bbox[2], bbox[3]))
     image_context = image_context.resize((224, 224))
@@ -56,6 +56,7 @@ class Emotic_CSVDataset(Dataset):
     cont_labels = ast.literal_eval(row['Continuous_Labels'])
     one_hot_cat_labels = self.cat_to_one_hot(cat_labels)
     area = (bbox[2]-bbox[0])*(bbox[3]-bbox[1])
+    #cat_idx = self.idx_select(cat_labels)
     return self.context_norm(self.transform(image_context)),torch.tensor(bbox), torch.tensor(one_hot_cat_labels, dtype=torch.float32), torch.tensor(area)
   
   def cat_to_one_hot(self, cat):
@@ -63,3 +64,11 @@ class Emotic_CSVDataset(Dataset):
     for em in cat:
       one_hot_cat[self.cat2ind[em]] = 1
     return one_hot_cat
+
+  '''
+  def idx_select(self,cat):
+    x = []
+    for em in cat:
+      x.append(self.cat2ind[em])
+    return np.array(x)
+  '''
